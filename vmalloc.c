@@ -12,8 +12,9 @@
 #define _unlikely_(x) __builtin_expect(!!(x), 0)
 #define _malloc_      __attribute__((malloc))
 
-static const size_t threshold = 1 << 20;
-static const size_t chunk_size = 4096 * 1024;
+#define ARENA_COUNT   20
+#define THRESHOLD     1 << ARENA_COUNT
+#define CHUNK_SIZE    4096 * 1024
 
 struct arena {
     size_t class;
@@ -21,7 +22,7 @@ struct arena {
     uint8_t data[];
 };
 
-struct arena *arenas[17] = { NULL };
+static struct arena *arenas[ARENA_COUNT] = { NULL };
 
 static size_t sizeclass(size_t size)
 {
@@ -59,7 +60,7 @@ static inline _malloc_ void *mmap_memmory(size_t size)
 
 static struct arena *new_arena(size_t class)
 {
-    struct arena *arena = mmap_memmory(chunk_size);
+    struct arena *arena = mmap_memmory(CHUNK_SIZE);
 
     if (_likely_(arena)) {
         arena->class = class;
@@ -94,7 +95,7 @@ void *allocate(size_t size)
 {
     if (_unlikely_(size == 0))
         return NULL;
-    if (_likely_(size <= threshold))
+    if (_likely_(size <= THRESHOLD))
         return allocate_small(size);
 
     printf("+ large allocation of %zu\n", size);
@@ -128,12 +129,12 @@ void deallocate(void *ptr)
     size_t i;
 
     printf("- deallocating\n");
-    for (i = 0; i < sizeof(arenas) / sizeof(arenas[0]); ++i) {
+    for (i = 0; i < ARENA_COUNT; ++i) {
         if (arenas[i] == NULL)
             continue;
 
         uintptr_t begin = (uintptr_t)arenas[i]->data;
-        uintptr_t end = begin + chunk_size - sizeof(struct arena);
+        uintptr_t end = begin + CHUNK_SIZE - sizeof(struct arena);
 
         printf("   0x%zX <= 0x%zX < 0x%zX\n", begin, ptr_addr, end);
 
@@ -148,7 +149,7 @@ void deallocate(void *ptr)
 
 void deallocate_sized(void *ptr, size_t size)
 {
-    if (_likely_(size <= threshold)) {
+    if (_likely_(size <= THRESHOLD)) {
         size_t class = sizeclass(size);
         size_t idx = sizeclass_to_index(class);
 
