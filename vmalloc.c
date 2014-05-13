@@ -16,7 +16,7 @@
 #define THRESHOLD     1 << ARENA_COUNT
 #define CHUNK_SIZE    4096 * 1024
 
-struct arena {
+struct __attribute__((packed)) arena {
     size_t class;
     uint64_t map;
     uint8_t data[];
