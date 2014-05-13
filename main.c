@@ -26,7 +26,7 @@ int main(void)
 
     deallocate(a);
     a = allocate(big_size);
-    deallocate_sized(a, big_size);
+    deallocate(a);
     a = allocate(sizeof(int));
 
     printf("a b c d: %d %d %d %d\n", *a, *b, *c, *d);

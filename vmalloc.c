@@ -97,7 +97,11 @@ void *allocate(size_t size)
         return allocate_small(size);
 
     printf("+ large allocation of %zu\n", size);
-    return mmap_memmory(size);
+
+    size_t realsize = size + sizeof(size_t);
+    size_t *memory = mmap_memmory(realsize);
+    *memory = realsize;
+    return memory + 1;
 }
 
 static void deallocate_from_arena(struct arena *arena, uintptr_t ptr_addr)
@@ -108,6 +112,13 @@ static void deallocate_from_arena(struct arena *arena, uintptr_t ptr_addr)
         printf("- deallocating %zu in slot %zu\n", arena->class, diff / arena->class);
         arena->map = map_unset(arena->map, diff / arena->class);
     }
+}
+
+static void deallocate_large(void *ptr)
+{
+    size_t *memory = (size_t *)ptr - 1;
+    printf("- large deallocation of %zu\n", *memory - sizeof(size_t));
+    munmap(memory, *memory);
 }
 
 void deallocate(void *ptr)
@@ -131,7 +142,7 @@ void deallocate(void *ptr)
         }
     }
 
-    printf("FUCK: don't know the size to free... TODO\n");
+    deallocate_large(ptr);
 }
 
 void deallocate_sized(void *ptr, size_t size)
@@ -141,9 +152,8 @@ void deallocate_sized(void *ptr, size_t size)
         size_t idx = sizeclass_to_index(class);
 
         deallocate_from_arena(arenas[idx], (uintptr_t)ptr);
-        return;
+    } else {
+        deallocate_large(ptr);
     }
 
-    printf("- large deallocation of %zu\n", size);
-    munmap(ptr, size);
 }
