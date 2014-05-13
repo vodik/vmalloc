@@ -51,7 +51,6 @@ static inline uint64_t map_unset(uint64_t map, uint8_t bit)
 static inline void *mmap_memmory(size_t size)
 {
     uint8_t *memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-
     if (_unlikely_(memory == MAP_FAILED))
         errno = ENOMEM;
     return memory;
