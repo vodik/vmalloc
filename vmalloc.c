@@ -1,7 +1,7 @@
-#define _GNU_SOURCE
-#include <stdio.h>
+#include "vmalloc.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -90,7 +90,7 @@ static _malloc_ void *allocate_small(size_t size)
     return &arena->data[arena->class * i];
 }
 
-void _malloc_ *allocate(size_t size)
+void *allocate(size_t size)
 {
     if (_unlikely_(size == 0))
         return NULL;
