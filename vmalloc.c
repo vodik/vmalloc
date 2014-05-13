@@ -10,6 +10,7 @@
 
 #define _likely_(x)   __builtin_expect(!!(x), 1)
 #define _unlikely_(x) __builtin_expect(!!(x), 0)
+#define _malloc_      __attribute__((malloc))
 
 static const size_t threshold = 1 << 20;
 static const size_t chunk_size = 4096 * 1024;
@@ -48,7 +49,7 @@ static inline uint64_t map_unset(uint64_t map, uint8_t bit)
     return map & ~(1 << bit);
 }
 
-static inline void *mmap_memmory(size_t size)
+static inline _malloc_ void *mmap_memmory(size_t size)
 {
     uint8_t *memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (_unlikely_(memory == MAP_FAILED))
@@ -68,7 +69,7 @@ static struct arena *new_arena(size_t class)
     return arena;
 }
 
-static void *allocate_small(size_t size)
+static _malloc_ void *allocate_small(size_t size)
 {
     struct arena *arena;
     size_t class = sizeclass(size);
@@ -89,7 +90,7 @@ static void *allocate_small(size_t size)
     return &arena->data[arena->class * i];
 }
 
-void *allocate(size_t size)
+void _malloc_ *allocate(size_t size)
 {
     if (_unlikely_(size == 0))
         return NULL;
