@@ -157,5 +157,4 @@ void deallocate_sized(void *ptr, size_t size)
     } else {
         deallocate_large(ptr);
     }
-
 }
