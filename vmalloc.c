@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <memory.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -18,39 +19,39 @@
 
 struct __attribute__((packed)) arena {
     size_t class;
-    uint64_t map;
+    uint8_t map[32];
     uint8_t data[];
 };
 
 static struct arena *arenas[ARENA_COUNT] = { NULL };
 
-static size_t sizeclass(size_t size)
+static inline size_t sizeclass(size_t size)
 {
     size_t pow2 = 1 << (32 - __builtin_clz(size - 1));
     return pow2 < 16 ? 16 : pow2;
 }
 
-static size_t sizeclass_to_index(size_t class)
+static inline size_t sizeclass_to_index(size_t class)
 {
     return __builtin_ctz(class) - 4;
 }
 
-static inline bool map_check(uint64_t map, uint8_t bit)
+static inline bool bit_check(uint8_t map[], uint8_t bit)
 {
-    return map & 1 << bit;
+    return map[bit / 8] & (1 << (bit % 8));
 }
 
-static inline uint64_t map_set(uint64_t map, uint8_t bit)
+static inline void bit_set(uint8_t map[], uint8_t bit)
 {
-    return map | 1 << bit;
+    map[bit / 8] |= (1 << (bit % 8));
 }
 
-static inline uint64_t map_unset(uint64_t map, uint8_t bit)
+static inline void bit_unset(uint8_t map[], uint8_t bit)
 {
-    return map & ~(1 << bit);
+    map[bit / 8] &= ~(1 << (bit % 8));
 }
 
-static inline _malloc_ void *mmap_memmory(size_t size)
+static inline _malloc_ void *mbit_memmory(size_t size)
 {
     uint8_t *memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (_unlikely_(memory == MAP_FAILED))
@@ -60,11 +61,11 @@ static inline _malloc_ void *mmap_memmory(size_t size)
 
 static struct arena *new_arena(size_t class)
 {
-    struct arena *arena = mmap_memmory(CHUNK_SIZE);
+    struct arena *arena = mbit_memmory(CHUNK_SIZE);
 
     if (_likely_(arena)) {
         arena->class = class;
-        arena->map = 0L;
+        memset(arena->map, 0, sizeof(arena->map));
     }
 
     return arena;
@@ -84,10 +85,10 @@ static _malloc_ void *allocate_small(size_t size)
     arena = arenas[idx];
 
     /* TODO: only be used once pool if full? */
-    for (i = 0; i < sizeof(arena->map) * 8 && map_check(arena->map, i); ++i);
+    for (i = 0; i < sizeof(arena->map) * 8 && bit_check(arena->map, i); ++i);
 
     printf("+ allocating %zu in slot %zu\n", sizeclass(size), i);
-    arena->map = map_set(arena->map, i);
+    bit_set(arena->map, i);
     return &arena->data[arena->class * i];
 }
 
@@ -101,7 +102,7 @@ void *allocate(size_t size)
     printf("+ large allocation of %zu\n", size);
 
     size_t realsize = size + sizeof(size_t);
-    size_t *memory = mmap_memmory(realsize);
+    size_t *memory = mbit_memmory(realsize);
     *memory = realsize;
     return memory + 1;
 }
@@ -112,7 +113,7 @@ static void deallocate_from_arena(struct arena *arena, uintptr_t ptr_addr)
 
     if (diff >= 0 && diff % arena->class == 0) {
         printf("- deallocating %zu in slot %zu\n", arena->class, diff / arena->class);
-        arena->map = map_unset(arena->map, diff / arena->class);
+        bit_unset(arena->map, diff / arena->class);
     }
 }
 
