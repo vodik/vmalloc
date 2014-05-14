@@ -34,15 +34,18 @@ int main(void)
     b = allocate(102);
     *b = 102;
 
-    printf("a b c d: %d %d %d %d\n", *a, *b, *c, *d);
-
     /* loop to exhaust pool */
     int i;
     for (i = 0; i < 256; ++i) {
         int *foo = allocate(sizeof(int));
-        if (foo == NULL)
-            err(1, "failed to allocate memory");
+
+        if (foo == NULL) {
+            warn("failed to allocate memory");
+            break;
+        }
 
         *foo = -i;
     }
+
+    printf("a b c d: %d %d %d %d\n", *a, *b, *c, *d);
 }
