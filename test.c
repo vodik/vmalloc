@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <err.h>
 
 #include "vmalloc.h"
 
@@ -34,4 +35,14 @@ int main(void)
     *b = 102;
 
     printf("a b c d: %d %d %d %d\n", *a, *b, *c, *d);
+
+    /* loop to exhaust pool */
+    int i;
+    for (i = 0; i < 256; ++i) {
+        int *foo = allocate(sizeof(int));
+        if (foo == NULL)
+            err(1, "failed to allocate memory");
+
+        *foo = -i;
+    }
 }

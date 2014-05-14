@@ -76,6 +76,7 @@ static _malloc_ void *allocate_small(size_t size)
     struct arena *arena;
     size_t class = sizeclass(size);
     size_t i, idx = sizeclass_to_index(class);
+    size_t max_bit;
 
     if (_unlikely_(!arenas[idx])) {
         printf("   new arena, %zu\n", sizeclass(size));
@@ -83,9 +84,13 @@ static _malloc_ void *allocate_small(size_t size)
     }
 
     arena = arenas[idx];
+    max_bit = sizeof(arena->map) * 8 + 1;
 
-    /* TODO: only be used once pool if full? */
-    for (i = 0; i < sizeof(arena->map) * 8 && bit_check(arena->map, i); ++i);
+    for (i = 0; i < max_bit && bit_check(arena->map, i); ++i);
+    if (i == max_bit) {
+        errno = ENOMEM;
+        return NULL;
+    }
 
     printf("+ allocating %zu in slot %zu\n", sizeclass(size), i);
     bit_set(arena->map, i);
