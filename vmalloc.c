@@ -51,7 +51,7 @@ static inline void bit_unset(uint8_t map[], uint8_t bit)
     map[bit / 8] &= ~(1 << (bit % 8));
 }
 
-static inline _malloc_ void *mbit_memmory(size_t size)
+static inline _malloc_ void *mmap_memmory(size_t size)
 {
     uint8_t *memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (_unlikely_(memory == MAP_FAILED))
@@ -61,7 +61,7 @@ static inline _malloc_ void *mbit_memmory(size_t size)
 
 static struct arena *new_arena(size_t class)
 {
-    struct arena *arena = mbit_memmory(CHUNK_SIZE);
+    struct arena *arena = mmap_memmory(CHUNK_SIZE);
 
     if (_likely_(arena)) {
         arena->class = class;
@@ -107,7 +107,7 @@ void *allocate(size_t size)
     printf("+ large allocation of %zu\n", size);
 
     size_t realsize = size + sizeof(size_t);
-    size_t *memory = mbit_memmory(realsize);
+    size_t *memory = mmap_memmory(realsize);
     *memory = realsize;
     return memory + 1;
 }
