@@ -36,16 +36,20 @@ int main(void)
 
     /* loop to exhaust pool */
     int i;
+    int *pool[256];
     for (i = 0; i < 256; ++i) {
-        int *foo = allocate(sizeof(int));
+        pool[i] = allocate(sizeof(int));
 
-        if (foo == NULL) {
+        if (pool[i] == NULL) {
             warn("failed to allocate memory");
             break;
         }
 
-        *foo = -i;
+        *pool[i] = -i;
     }
 
     printf("a b c d: %d %d %d %d\n", *a, *b, *c, *d);
+
+    /* for (i = 0; i < 256; ++i) */
+    /*     deallocate(pool[i]); */
 }

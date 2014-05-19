@@ -15,11 +15,13 @@
 
 #define ARENA_COUNT   20
 #define THRESHOLD     1 << ARENA_COUNT
-#define CHUNK_SIZE    4096 * 1024
+#define MAP_SIZE      64
+#define RESOLUTION    MAP_SIZE * 8
 
 struct __attribute__((packed)) arena {
     size_t class;
-    uint8_t map[32];
+    uint8_t map[MAP_SIZE];
+    struct arena *next;
     uint8_t data[];
 };
 
@@ -29,6 +31,11 @@ static inline size_t sizeclass(size_t size)
 {
     size_t pow2 = 1 << (32 - __builtin_clz(size - 1));
     return pow2 < 16 ? 16 : pow2;
+}
+
+static inline size_t chunk_size(size_t class)
+{
+    return sizeof(struct arena) + class * RESOLUTION;
 }
 
 static inline size_t sizeclass_to_index(size_t class)
@@ -61,10 +68,11 @@ static inline _malloc_ void *mmap_memmory(size_t size)
 
 static struct arena *new_arena(size_t class)
 {
-    struct arena *arena = mmap_memmory(CHUNK_SIZE);
+    struct arena *arena = mmap_memmory(chunk_size(class));
 
     if (_likely_(arena)) {
         arena->class = class;
+        arena->next = NULL;
         memset(arena->map, 0, sizeof(arena->map));
     }
 
@@ -76,25 +84,35 @@ static _malloc_ void *allocate_small(size_t size)
     struct arena *arena;
     size_t class = sizeclass(size);
     size_t i, idx = sizeclass_to_index(class);
-    size_t max_bit;
 
     if (_unlikely_(!arenas[idx])) {
-        printf("   new arena, %zu\n", sizeclass(size));
-        arenas[idx] = new_arena(sizeclass(size));
+        printf("   new arena, %zu\n", class);
+        arenas[idx] = new_arena(class);
     }
 
     arena = arenas[idx];
-    max_bit = sizeof(arena->map) * 8 + 1;
 
-    for (i = 0; i < max_bit && bit_check(arena->map, i); ++i);
-    if (i == max_bit) {
-        errno = ENOMEM;
-        return NULL;
+    for (;;) {
+        for (i = 0; i < RESOLUTION && bit_check(arena->map, i); ++i);
+
+        if (_unlikely_(i == RESOLUTION)) {
+            if (!arena->next) {
+                printf("   new arena (next), %zu\n", class);
+                arena->next = new_arena(class);
+            }
+
+            if (_unlikely_(!arena->next)) {
+                errno = ENOMEM;
+                return NULL;
+            }
+
+            arena = arena->next;
+        } else {
+            printf("+ allocating %zu in slot %zu\n", sizeclass(size), i);
+            bit_set(arena->map, i);
+            return &arena->data[arena->class * i];
+        }
     }
-
-    printf("+ allocating %zu in slot %zu\n", sizeclass(size), i);
-    bit_set(arena->map, i);
-    return &arena->data[arena->class * i];
 }
 
 void *allocate(size_t size)
@@ -136,17 +154,21 @@ void deallocate(void *ptr)
 
     printf("- deallocating\n");
     for (i = 0; i < ARENA_COUNT; ++i) {
-        if (arenas[i] == NULL)
+        struct arena *arena = arenas[i];
+
+        if (!arenas)
             continue;
 
-        uintptr_t begin = (uintptr_t)arenas[i]->data;
-        uintptr_t end = begin + CHUNK_SIZE - sizeof(struct arena);
+        for (; arena; arena = arena->next) {
+            uintptr_t begin = (uintptr_t)arena->data;
+            uintptr_t end = begin + arena->class * RESOLUTION;
 
-        printf("   0x%zX <= 0x%zX < 0x%zX\n", begin, ptr_addr, end);
+            printf("   0x%zX <= 0x%zX < 0x%zX\n", begin, ptr_addr, end);
 
-        if (ptr_addr >= begin && ptr_addr < end) {
-            deallocate_from_arena(arenas[i], ptr_addr);
-            return;
+            if (ptr_addr >= begin && ptr_addr < end) {
+                deallocate_from_arena(arena, ptr_addr);
+                return;
+            }
         }
     }
 
