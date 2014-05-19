@@ -36,17 +36,17 @@ static inline size_t sizeclass_to_index(size_t class)
     return __builtin_ctz(class) - 4;
 }
 
-static inline bool bit_check(uint8_t map[], uint8_t bit)
+static inline bool bit_check(uint8_t map[], uint64_t bit)
 {
     return map[bit / 8] & (1 << (bit % 8));
 }
 
-static inline void bit_set(uint8_t map[], uint8_t bit)
+static inline void bit_set(uint8_t map[], uint64_t bit)
 {
     map[bit / 8] |= (1 << (bit % 8));
 }
 
-static inline void bit_unset(uint8_t map[], uint8_t bit)
+static inline void bit_unset(uint8_t map[], uint64_t bit)
 {
     map[bit / 8] &= ~(1 << (bit % 8));
 }
