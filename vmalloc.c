@@ -98,7 +98,7 @@ static _malloc_ void *allocate_small(size_t size)
     for (;;) {
         for (i = 0; i < RESOLUTION && bit_check(arena->map, i); ++i);
 
-        if (_unlikely_(i != RESOLUTION)) {
+        if (_likely_(i != RESOLUTION)) {
             bit_set(arena->map, i);
             return &arena->data[arena->class * i];
         }
