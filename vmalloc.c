@@ -150,7 +150,7 @@ void deallocate(void *ptr)
     for (i = 0; i < ARENA_COUNT; ++i) {
         struct arena *arena = arenas[i];
 
-        if (!arenas)
+        if (!arena)
             continue;
 
         for (; arena; arena = arena->next) {
