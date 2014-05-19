@@ -96,11 +96,15 @@ static _malloc_ void *allocate_small(size_t size)
     arena = arenas[idx];
 
     for (;;) {
-        for (i = 0; i < RESOLUTION && bit_check(arena->map, i); ++i);
+        if (!bit_check(arena->map, 0)) {
+            for (i = 1; i < RESOLUTION && bit_check(arena->map, i); ++i);
 
-        if (_likely_(i != RESOLUTION)) {
-            bit_set(arena->map, i);
-            return &arena->data[arena->class * i];
+            if (_unlikely_(i == RESOLUTION - 1))
+                bit_set(arena->map, 0);
+            if (_likely_(i != RESOLUTION)) {
+                bit_set(arena->map, i);
+                return &arena->data[arena->class * i];
+            }
         }
 
         if (!arena->next) {
@@ -132,8 +136,10 @@ static void deallocate_from_arena(struct arena *arena, uintptr_t ptr_addr)
 {
     ptrdiff_t diff = ptr_addr - (uintptr_t)arena->data;
 
-    if (diff >= 0 && diff % arena->class == 0)
+    if (diff >= 0 && diff % arena->class == 0) {
+        bit_unset(arena->map, 0);
         bit_unset(arena->map, diff / arena->class);
+    }
 }
 
 static void deallocate_large(void *ptr)
