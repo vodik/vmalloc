@@ -86,8 +86,11 @@ static _malloc_ void *allocate_small(size_t size)
     size_t i, idx = sizeclass_to_index(class);
 
     if (_unlikely_(!arenas[idx])) {
-        printf("   new arena, %zu\n", class);
         arenas[idx] = new_arena(class);
+        if (_unlikely_(!arenas[idx])) {
+            errno = ENOMEM;
+            return NULL;
+        }
     }
 
     arena = arenas[idx];
@@ -95,23 +98,20 @@ static _malloc_ void *allocate_small(size_t size)
     for (;;) {
         for (i = 0; i < RESOLUTION && bit_check(arena->map, i); ++i);
 
-        if (_unlikely_(i == RESOLUTION)) {
-            if (!arena->next) {
-                printf("   new arena (next), %zu\n", class);
-                arena->next = new_arena(class);
-            }
+        if (_unlikely_(i != RESOLUTION)) {
+            bit_set(arena->map, i);
+            return &arena->data[arena->class * i];
+        }
 
+        if (!arena->next) {
+            arena->next = new_arena(class);
             if (_unlikely_(!arena->next)) {
                 errno = ENOMEM;
                 return NULL;
             }
-
-            arena = arena->next;
-        } else {
-            printf("+ allocating %zu in slot %zu\n", sizeclass(size), i);
-            bit_set(arena->map, i);
-            return &arena->data[arena->class * i];
         }
+
+        arena = arena->next;
     }
 }
 
@@ -121,8 +121,6 @@ void *allocate(size_t size)
         return NULL;
     if (_likely_(size <= THRESHOLD))
         return allocate_small(size);
-
-    printf("+ large allocation of %zu\n", size);
 
     size_t realsize = size + sizeof(size_t);
     size_t *memory = mmap_memmory(realsize);
@@ -134,16 +132,13 @@ static void deallocate_from_arena(struct arena *arena, uintptr_t ptr_addr)
 {
     ptrdiff_t diff = ptr_addr - (uintptr_t)arena->data;
 
-    if (diff >= 0 && diff % arena->class == 0) {
-        printf("- deallocating %zu in slot %zu\n", arena->class, diff / arena->class);
+    if (diff >= 0 && diff % arena->class == 0)
         bit_unset(arena->map, diff / arena->class);
-    }
 }
 
 static void deallocate_large(void *ptr)
 {
     size_t *memory = (size_t *)ptr - 1;
-    printf("- large deallocation of %zu\n", *memory - sizeof(size_t));
     munmap(memory, *memory);
 }
 
@@ -152,7 +147,6 @@ void deallocate(void *ptr)
     uintptr_t ptr_addr = (uintptr_t)ptr;
     size_t i;
 
-    printf("- deallocating\n");
     for (i = 0; i < ARENA_COUNT; ++i) {
         struct arena *arena = arenas[i];
 
@@ -162,8 +156,6 @@ void deallocate(void *ptr)
         for (; arena; arena = arena->next) {
             uintptr_t begin = (uintptr_t)arena->data;
             uintptr_t end = begin + arena->class * RESOLUTION;
-
-            printf("   0x%zX <= 0x%zX < 0x%zX\n", begin, ptr_addr, end);
 
             if (ptr_addr >= begin && ptr_addr < end) {
                 deallocate_from_arena(arena, ptr_addr);
